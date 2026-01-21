@@ -1,0 +1,178 @@
+Build a production-ready CRM web app (HubSpot-style “Deals” pipeline) that supports a Kanban board view with the exact pipeline stages/columns and top filters shown below, plus admin-only internal fields for opportunities. Use modern stack and clean UI.
+
+TECH STACK (required)
+- Frontend: Next.js (App Router) + React + TypeScript + Tailwind
+- Backend: Next.js API routes (or server actions) + Prisma ORM
+- Database: Postgres
+- Auth: email/password + optional Google OAuth
+- RBAC: Admin, Manager, Sales
+- Hosting-ready: env vars, migrations, seed script, README
+
+CORE UI REQUIREMENTS (match screenshots)
+1) Deals Pipeline Board (Kanban)
+- Board columns (stages) must include:
+  - Discovery
+  - Crafting
+  - Proposal
+  - Refinement
+  - Contract Sent
+  - Closed Won
+  - Closed Lost
+- Each column header shows the stage name and a count badge (e.g., “Discovery 16”).
+- Drag-and-drop cards between columns to change stage.
+- Infinite/scrollable column lists with nice card layout.
+
+2) Top controls (header bar)
+- Search box for deals (name/company/owner)
+- View toggle: Board view (default) + Table view
+- Pipeline selector (e.g., “ChatLabs INC. CLD”)
+- Filters button + Advanced filters link
+- Sort button
+- Metrics button
+- Export button
+- Save view button
+
+3) Deal card layout (as shown)
+Each deal card shows:
+- Deal name (title)
+- Amount
+- Close date
+- Deal owner
+- Create date
+- Company name/logo (if present)
+- Last activity snippet (e.g., “Email an hour ago” / “Note 7 hours ago”)
+- Small action icons (can be simplified to: open deal, log activity, add note)
+- Optional probability badge circle (if enabled)
+
+4) Column totals (footer summary per column)
+At bottom of each stage column show:
+- Total amount
+- Weighted amount
+Weighted amount = Amount * Probability(stage)
+Probability is configurable per stage.
+
+FUNCTIONAL REQUIREMENTS (standard CRM)
+A) Deals (Opportunities)
+- CRUD: create, view, edit, delete deals
+- Fields (user-visible):
+  - Deal Name (required)
+  - Amount (currency; support USD/CAD optional)
+  - Stage (one of the stages listed)
+  - Close Date
+  - Deal Owner (user)
+  - Company (linked)
+  - Create Date (auto)
+  - Last Activity Date (auto)
+  - Tags/Labels (multi)
+- Activities (linked to deal):
+  - Types: Email, Call, Meeting, Note, Task
+  - Each activity has timestamp, summary, details, createdBy
+  - Deal card shows most recent activity summary and relative time
+- Table view:
+  - columns: Deal owner, Create date, Last activity date, Close date, Stage, Amount, Weighted amount
+  - sortable columns + pagination
+
+B) Companies
+- CRUD companies
+- Fields: name, logo(optional), website(optional), industry(optional), notes(optional)
+
+C) Contacts
+- CRUD contacts
+- Fields: first name, last name, email, phone, title, company link, notes
+
+D) Tasks
+- Create tasks linked to deals/contacts/companies
+- Due date, status, assignee, priority
+- “My Tasks” view
+
+E) Notes
+- Notes can be added to deals/companies/contacts
+- Keep an audit trail of edits (who/when)
+
+ADMIN-ONLY “INTERNAL FIELDS” (critical)
+Add an “Internal” section on the Deal details page that is:
+- Visible/editable ONLY by Admin (and optionally Manager)
+- Hidden or read-only for Sales
+
+Internal fields include (at minimum):
+- Internal probability override (optional; otherwise stage probability)
+- Weighted amount override (optional)
+- Cost estimate
+- Expected margin %
+- Forecast category (Pipeline / Best Case / Commit / Closed)
+- Internal deal score (0–100)
+- Internal notes (private)
+- Approval status (Draft/Needs Approval/Approved)
+- Audit log of internal changes (who changed what and when)
+
+PERMISSIONS / SECURITY
+- Sales: can only see/edit deals they own, unless shared by Manager/Admin
+- Manager: can see team deals
+- Admin: full access + can edit internal fields + manage pipelines/stages/probabilities
+- Every edit writes to an AuditLog table (entity, entityId, field, oldValue, newValue, userId, timestamp)
+
+PIPELINES & STAGES CONFIG
+- Allow multiple pipelines (e.g., “ChatLabs INC. CLD”)
+- Admin can configure:
+  - stage list/order
+  - stage probability (%) used for weighted amount
+  - stage color (optional)
+- Seed default pipeline with the 7 stages listed above and sensible probabilities:
+  - Discovery 20%
+  - Crafting 40%
+  - Proposal 60%
+  - Refinement 80%
+  - Contract Sent 90%
+  - Closed Won 100%
+  - Closed Lost 0%
+
+FILTERS / ADVANCED FILTERS
+Provide filter builder supporting:
+- owner, stage, amount range, close date range, last activity date range, company, tags
+“Advanced filters” can be a modal that lets user stack multiple conditions (AND/OR is a plus, but AND is acceptable).
+
+EXPORT
+- Export deals (current view/filter) to CSV including:
+  - deal name, amount, weighted amount, probability, stage, owner, company, close date, last activity date, create date
+- Admin export can include internal fields (non-admin export must exclude internal fields)
+
+METRICS
+Provide a simple metrics view:
+- totals by stage: count, total amount, weighted amount
+- won vs lost counts and amounts for a date range
+- pipeline forecast (sum of weighted)
+
+DATA MODEL (Prisma)
+Design Prisma schema with these entities:
+- User (role, teamId optional)
+- Team (optional)
+- Pipeline
+- Stage (belongs to pipeline; has order, probability)
+- Deal (belongs to pipeline; stageId; ownerId; companyId optional)
+- Company
+- Contact
+- Activity (type, summary, body, dealId optional, contactId optional, companyId optional)
+- Task (deal/contact/company links)
+- DealInternal (1:1 with Deal OR embedded fields in Deal)
+- AuditLog
+
+QUALITY / UX
+- Clean responsive UI
+- Fast list performance (server-side filtering)
+- Form validation and helpful empty states
+- Confirm dialogs on delete
+- Nice relative time labels for activities
+
+DELIVERABLES
+- Working app with seed data
+- README with setup steps:
+  - create .env
+  - prisma migrate
+  - prisma seed
+  - run dev server
+- Include sample users (admin/manager/sales) with passwords in README for local testing
+
+IMPORTANT
+- Implement drag-and-drop on board view.
+- Ensure admin can edit internal fields; non-admin cannot even see them.
+- Make sure the default Deals page looks and behaves like the screenshots: pipeline board with stages, deal cards, and column totals with weighted amount.
