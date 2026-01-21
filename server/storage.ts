@@ -3,6 +3,7 @@ import { db } from "./db";
 import {
   teams, crmUsers, pipelines, stages, companies, contacts, 
   deals, dealInternals, activities, tasks, notes, auditLog,
+  users,
   type Team, type InsertTeam,
   type CrmUser, type InsertCrmUser,
   type Pipeline, type InsertPipeline,
@@ -17,11 +18,18 @@ import {
   type AuditLogEntry, type InsertAuditLog,
 } from "@shared/schema";
 
+export interface CrmUserWithAuth extends CrmUser {
+  authProvider?: string;
+  microsoftUserId?: string;
+  isDisabled?: boolean;
+}
+
 export interface IStorage {
   // CRM Users
   getCrmUser(id: string): Promise<CrmUser | undefined>;
   getCrmUserByAuthId(authUserId: string): Promise<CrmUser | undefined>;
   getCrmUsers(): Promise<CrmUser[]>;
+  getCrmUsersWithAuth(): Promise<CrmUserWithAuth[]>;
   createCrmUser(user: InsertCrmUser): Promise<CrmUser>;
   updateCrmUser(id: string, data: Partial<InsertCrmUser>): Promise<CrmUser | undefined>;
 
@@ -110,6 +118,29 @@ export class DatabaseStorage implements IStorage {
 
   async getCrmUsers(): Promise<CrmUser[]> {
     return db.select().from(crmUsers).orderBy(asc(crmUsers.firstName));
+  }
+
+  async getCrmUsersWithAuth(): Promise<CrmUserWithAuth[]> {
+    const result = await db
+      .select({
+        id: crmUsers.id,
+        authUserId: crmUsers.authUserId,
+        role: crmUsers.role,
+        teamId: crmUsers.teamId,
+        firstName: crmUsers.firstName,
+        lastName: crmUsers.lastName,
+        email: crmUsers.email,
+        createdAt: crmUsers.createdAt,
+        updatedAt: crmUsers.updatedAt,
+        authProvider: users.authProvider,
+        microsoftUserId: users.microsoftUserId,
+        isDisabled: users.isDisabled,
+      })
+      .from(crmUsers)
+      .leftJoin(users, eq(crmUsers.authUserId, users.id))
+      .orderBy(asc(crmUsers.firstName));
+    
+    return result as CrmUserWithAuth[];
   }
 
   async createCrmUser(user: InsertCrmUser): Promise<CrmUser> {

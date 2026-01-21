@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -11,6 +11,9 @@ import { useAuth } from "@/hooks/use-auth";
 import { Skeleton } from "@/components/ui/skeleton";
 import NotFound from "@/pages/not-found";
 import LandingPage from "@/pages/landing";
+import LoginPage from "@/pages/login";
+import RegisterPage from "@/pages/register";
+import ResetPasswordPage from "@/pages/reset-password";
 import DealsPage from "@/pages/deals";
 import CompaniesPage from "@/pages/companies";
 import ContactsPage from "@/pages/contacts";
@@ -58,8 +61,25 @@ function AuthenticatedRoutes() {
   );
 }
 
+function PublicRoutes() {
+  const [location] = useLocation();
+  
+  if (location === "/login") {
+    return <LoginPage />;
+  }
+  if (location === "/register") {
+    return <RegisterPage />;
+  }
+  if (location.startsWith("/reset-password")) {
+    return <ResetPasswordPage />;
+  }
+  
+  return <LandingPage />;
+}
+
 function AppContent() {
-  const { user, isLoading } = useAuth();
+  const { isLoading, isAuthenticated } = useAuth();
+  const [location] = useLocation();
 
   if (isLoading) {
     return (
@@ -73,8 +93,17 @@ function AppContent() {
     );
   }
 
-  if (!user) {
-    return <LandingPage />;
+  if (!isAuthenticated) {
+    return <PublicRoutes />;
+  }
+
+  const isPublicRoute = ["/login", "/register", "/reset-password"].some(
+    (route) => location === route || location.startsWith(route)
+  );
+
+  if (isPublicRoute) {
+    window.location.href = "/";
+    return null;
   }
 
   return <AuthenticatedRoutes />;

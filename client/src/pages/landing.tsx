@@ -51,7 +51,7 @@ export default function LandingPage() {
                 <a href="#features">Features</a>
               </Button>
               <Button asChild data-testid="button-get-started-nav">
-                <a href="/api/login">
+                <a href="/login">
                   Get Started
                   <ArrowRight className="h-4 w-4 ml-2" />
                 </a>
@@ -76,7 +76,7 @@ export default function LandingPage() {
               </p>
               <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
                 <Button size="lg" asChild data-testid="button-get-started-hero">
-                  <a href="/api/login">
+                  <a href="/login">
                     Start Free
                     <ArrowRight className="h-4 w-4 ml-2" />
                   </a>
@@ -172,7 +172,7 @@ export default function LandingPage() {
             </p>
             <div className="mt-8">
               <Button size="lg" asChild data-testid="button-get-started-cta">
-                <a href="/api/login">
+                <a href="/login">
                   Get Started for Free
                   <ArrowRight className="h-4 w-4 ml-2" />
                 </a>

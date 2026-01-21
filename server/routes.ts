@@ -1,31 +1,29 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage, type DealFilters } from "./storage";
-import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
-import { authStorage } from "./replit_integrations/auth/storage";
+import { setupAuth, registerAuthRoutes, isAuthenticated, type AuthUser } from "./auth";
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // Setup authentication
+  // Setup authentication (local + Microsoft SSO)
   await setupAuth(app);
   registerAuthRoutes(app);
 
   // Helper to get current CRM user
   async function getCurrentCrmUser(req: Request) {
-    const authUser = req.user as any;
-    if (!authUser?.claims?.sub) return null;
+    const authUser = req.user as AuthUser;
+    if (!authUser?.id) return null;
     
-    let crmUser = await storage.getCrmUserByAuthId(authUser.claims.sub);
+    let crmUser = await storage.getCrmUserByAuthId(authUser.id);
     if (!crmUser) {
       // Create CRM user on first login
-      const authUserData = await authStorage.getUser(authUser.claims.sub);
       crmUser = await storage.createCrmUser({
-        authUserId: authUser.claims.sub,
-        firstName: authUserData?.firstName || authUser.claims.first_name || null,
-        lastName: authUserData?.lastName || authUser.claims.last_name || null,
-        email: authUserData?.email || authUser.claims.email || null,
+        authUserId: authUser.id,
+        firstName: authUser.firstName || null,
+        lastName: authUser.lastName || null,
+        email: authUser.email || null,
         role: "sales", // Default role
       });
     }
@@ -52,10 +50,26 @@ export async function registerRoutes(
     }
   });
 
-  // CRM Users
-  app.get("/api/users", isAuthenticated, async (req: Request, res: Response) => {
+  // CRM Users - public basic list for UI (names only for dropdowns)
+  app.get("/api/users/basic", isAuthenticated, async (req: Request, res: Response) => {
     try {
       const users = await storage.getCrmUsers();
+      res.json(users.map(u => ({ id: u.id, firstName: u.firstName, lastName: u.lastName, role: u.role })));
+    } catch (error) {
+      console.error("Error fetching basic users:", error);
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  // CRM Users (with auth provider info - admin only)
+  app.get("/api/users", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const crmUser = await getCurrentCrmUser(req);
+      if (crmUser?.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const users = await storage.getCrmUsersWithAuth();
       res.json(users);
     } catch (error) {
       console.error("Error fetching users:", error);

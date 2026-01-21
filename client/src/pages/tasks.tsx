@@ -75,8 +75,8 @@ export default function TasksPage() {
     queryKey: ["/api/tasks"],
   });
 
-  const { data: users = [] } = useQuery<CrmUser[]>({
-    queryKey: ["/api/users"],
+  const { data: users = [] } = useQuery<Pick<CrmUser, 'id' | 'firstName' | 'lastName' | 'role'>[]>({
+    queryKey: ["/api/users/basic"],
   });
 
   const { data: deals = [] } = useQuery<Deal[]>({

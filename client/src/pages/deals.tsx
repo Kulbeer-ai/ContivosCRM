@@ -63,8 +63,8 @@ export default function DealsPage() {
     queryKey: ["/api/companies"],
   });
 
-  const { data: users = [] } = useQuery<CrmUser[]>({
-    queryKey: ["/api/users"],
+  const { data: users = [] } = useQuery<Pick<CrmUser, 'id' | 'firstName' | 'lastName' | 'role'>[]>({
+    queryKey: ["/api/users/basic"],
   });
 
   useEffect(() => {

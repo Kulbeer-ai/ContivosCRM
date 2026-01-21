@@ -1,11 +1,20 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Edit, Trash2, GripVertical, Save } from "lucide-react";
+import { Plus, Edit, Trash2, GripVertical, Save, Shield, Users, Key, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -24,10 +33,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
-import type { Pipeline, Stage, CrmUser } from "@shared/schema";
+import type { Pipeline, Stage, CrmUser, SsoSettings } from "@shared/schema";
 
 export default function SettingsPage() {
   const { toast } = useToast();
@@ -58,6 +68,33 @@ export default function SettingsPage() {
 
   const { data: stages = [], isLoading: stagesLoading } = useQuery<Stage[]>({
     queryKey: ["/api/stages"],
+  });
+
+  const { data: ssoSettings } = useQuery<SsoSettings>({
+    queryKey: ["/api/auth/sso-settings"],
+    enabled: currentUser?.role === "admin",
+  });
+
+  const [ssoForm, setSsoForm] = useState({
+    microsoftTenantId: "",
+    allowedTenantIds: "",
+    allowedEmailDomains: "",
+    defaultRoleForSso: "sales",
+    autoProvisionUsers: true,
+    ssoOnly: false,
+  });
+
+  const updateSsoMutation = useMutation({
+    mutationFn: async (data: any) => {
+      await apiRequest("PATCH", "/api/auth/sso-settings", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/sso-settings"] });
+      toast({ title: "Success", description: "SSO settings updated successfully" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update SSO settings", variant: "destructive" });
+    },
   });
 
   const isAdmin = currentUser?.role === "admin";
@@ -331,6 +368,152 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Shield className="h-5 w-5" />
+            <div>
+              <CardTitle>Authentication & SSO</CardTitle>
+              <CardDescription>Configure Microsoft Azure AD Single Sign-On</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid gap-6 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="microsoftTenantId">Microsoft Tenant ID</Label>
+              <Input
+                id="microsoftTenantId"
+                placeholder="e.g., common or your-tenant-id"
+                value={ssoForm.microsoftTenantId || ssoSettings?.microsoftTenantId || ""}
+                onChange={(e) => setSsoForm({ ...ssoForm, microsoftTenantId: e.target.value })}
+                data-testid="input-microsoft-tenant-id"
+              />
+              <p className="text-xs text-muted-foreground">
+                Use "common" for multi-tenant or your specific tenant ID for single-tenant
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="defaultRole">Default Role for SSO Users</Label>
+              <Select
+                value={ssoForm.defaultRoleForSso || ssoSettings?.defaultRoleForSso || "sales"}
+                onValueChange={(value) => setSsoForm({ ...ssoForm, defaultRoleForSso: value })}
+              >
+                <SelectTrigger data-testid="select-default-role">
+                  <SelectValue placeholder="Select role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sales">Sales</SelectItem>
+                  <SelectItem value="manager">Manager</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="allowedTenantIds">Allowed Tenant IDs</Label>
+            <Textarea
+              id="allowedTenantIds"
+              placeholder="Enter allowed tenant IDs, one per line"
+              value={ssoForm.allowedTenantIds || ssoSettings?.allowedTenantIds?.join("\n") || ""}
+              onChange={(e) => setSsoForm({ ...ssoForm, allowedTenantIds: e.target.value })}
+              rows={3}
+              data-testid="input-allowed-tenant-ids"
+            />
+            <p className="text-xs text-muted-foreground">
+              Leave empty to allow all tenants, or specify specific tenant IDs
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="allowedEmailDomains">Allowed Email Domains</Label>
+            <Textarea
+              id="allowedEmailDomains"
+              placeholder="Enter allowed email domains, one per line (e.g., company.com)"
+              value={ssoForm.allowedEmailDomains || ssoSettings?.allowedEmailDomains?.join("\n") || ""}
+              onChange={(e) => setSsoForm({ ...ssoForm, allowedEmailDomains: e.target.value })}
+              rows={3}
+              data-testid="input-allowed-email-domains"
+            />
+            <p className="text-xs text-muted-foreground">
+              Leave empty to allow all domains, or specify domains for auto-provisioning
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between rounded-lg border p-4">
+              <div className="space-y-0.5">
+                <Label htmlFor="autoProvision">Auto-provision SSO Users</Label>
+                <p className="text-sm text-muted-foreground">
+                  Automatically create user accounts when users sign in via SSO
+                </p>
+              </div>
+              <Switch
+                id="autoProvision"
+                checked={ssoForm.autoProvisionUsers ?? ssoSettings?.autoProvisionUsers ?? true}
+                onCheckedChange={(checked) => setSsoForm({ ...ssoForm, autoProvisionUsers: checked })}
+                data-testid="switch-auto-provision"
+              />
+            </div>
+
+            <div className="flex items-center justify-between rounded-lg border p-4">
+              <div className="space-y-0.5">
+                <Label htmlFor="ssoOnly">SSO-Only Mode</Label>
+                <p className="text-sm text-muted-foreground">
+                  Require SSO login for users from allowed email domains
+                </p>
+              </div>
+              <Switch
+                id="ssoOnly"
+                checked={ssoForm.ssoOnly ?? ssoSettings?.ssoOnly ?? false}
+                onCheckedChange={(checked) => setSsoForm({ ...ssoForm, ssoOnly: checked })}
+                data-testid="switch-sso-only"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end">
+            <Button
+              onClick={() => {
+                const data = {
+                  microsoftTenantId: ssoForm.microsoftTenantId || ssoSettings?.microsoftTenantId,
+                  allowedTenantIds: ssoForm.allowedTenantIds
+                    ? ssoForm.allowedTenantIds.split("\n").filter((s: string) => s.trim())
+                    : ssoSettings?.allowedTenantIds,
+                  allowedEmailDomains: ssoForm.allowedEmailDomains
+                    ? ssoForm.allowedEmailDomains.split("\n").filter((s: string) => s.trim())
+                    : ssoSettings?.allowedEmailDomains,
+                  defaultRoleForSso: ssoForm.defaultRoleForSso || ssoSettings?.defaultRoleForSso,
+                  autoProvisionUsers: ssoForm.autoProvisionUsers ?? ssoSettings?.autoProvisionUsers,
+                  ssoOnly: ssoForm.ssoOnly ?? ssoSettings?.ssoOnly,
+                };
+                updateSsoMutation.mutate(data);
+              }}
+              disabled={updateSsoMutation.isPending}
+              data-testid="button-save-sso-settings"
+            >
+              {updateSsoMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save SSO Settings
+            </Button>
+          </div>
+
+          <div className="border-t pt-4">
+            <p className="text-sm text-muted-foreground mb-2">
+              <strong>Note:</strong> To enable Microsoft SSO, you need to configure the following environment variables:
+            </p>
+            <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
+              <li>MICROSOFT_CLIENT_ID - Your Azure AD application client ID</li>
+              <li>MICROSOFT_CLIENT_SECRET - Your Azure AD application client secret</li>
+              <li>MICROSOFT_TENANT_ID (optional) - Can also be set above</li>
+            </ul>
+          </div>
+        </CardContent>
+      </Card>
+
+      <UserManagement />
+
       <Dialog open={pipelineDialogOpen} onOpenChange={setPipelineDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -450,5 +633,154 @@ export default function SettingsPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+function UserManagement() {
+  const { toast } = useToast();
+
+  const { data: users = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/users"],
+  });
+
+  const disableUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      await apiRequest("POST", `/api/auth/users/${userId}/disable`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      toast({ title: "Success", description: "User disabled successfully" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to disable user", variant: "destructive" });
+    },
+  });
+
+  const enableUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      await apiRequest("POST", `/api/auth/users/${userId}/enable`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      toast({ title: "Success", description: "User enabled successfully" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to enable user", variant: "destructive" });
+    },
+  });
+
+  const unlinkMicrosoftMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      await apiRequest("POST", `/api/auth/users/${userId}/unlink-microsoft`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      toast({ title: "Success", description: "Microsoft account unlinked" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to unlink Microsoft account", variant: "destructive" });
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>User Management</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Skeleton className="h-40" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <Users className="h-5 w-5" />
+          <div>
+            <CardTitle>User Management</CardTitle>
+            <CardDescription>Manage user accounts and authentication methods</CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          {users.map((user) => (
+            <div
+              key={user.id}
+              className="flex items-center justify-between p-4 border rounded-lg"
+              data-testid={`user-row-${user.id}`}
+            >
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">
+                    {user.firstName} {user.lastName}
+                  </span>
+                  <Badge variant="outline">{user.role}</Badge>
+                  {user.isDisabled && (
+                    <Badge variant="destructive">Disabled</Badge>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground">{user.email}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge variant="secondary" className="text-xs">
+                    {user.authProvider === "microsoft" ? "Microsoft SSO" : 
+                     user.authProvider === "local" ? "Email/Password" : "Replit"}
+                  </Badge>
+                  {user.microsoftUserId && (
+                    <Badge variant="outline" className="text-xs">
+                      <Key className="h-3 w-3 mr-1" />
+                      MS Linked
+                    </Badge>
+                  )}
+                </div>
+              </div>
+              <div className="flex gap-2">
+                {user.microsoftUserId && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => unlinkMicrosoftMutation.mutate(user.authUserId)}
+                    disabled={unlinkMicrosoftMutation.isPending}
+                    data-testid={`button-unlink-microsoft-${user.id}`}
+                  >
+                    Unlink Microsoft
+                  </Button>
+                )}
+                {user.isDisabled ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => enableUserMutation.mutate(user.authUserId)}
+                    disabled={enableUserMutation.isPending}
+                    data-testid={`button-enable-user-${user.id}`}
+                  >
+                    Enable
+                  </Button>
+                ) : (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => disableUserMutation.mutate(user.authUserId)}
+                    disabled={disableUserMutation.isPending}
+                    data-testid={`button-disable-user-${user.id}`}
+                  >
+                    Disable
+                  </Button>
+                )}
+              </div>
+            </div>
+          ))}
+          {users.length === 0 && (
+            <p className="text-center text-muted-foreground py-8">
+              No users found.
+            </p>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

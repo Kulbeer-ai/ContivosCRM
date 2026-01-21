@@ -6,10 +6,20 @@ A production-ready CRM web application featuring a HubSpot-style deals pipeline 
 
 ## Recent Changes (January 2026)
 
-- Fixed stage dropdown loading in deal creation dialog (query parameters now passed correctly)
-- Fixed deal creation with nullable company field (empty strings converted to null)
-- Added proper FK constraint handling for delete operations (cascade for pipelines/stages, nullify for companies/contacts)
-- Restricted internal deal fields to admin-only access (both UI and API)
+- **Dual Authentication System**: Implemented comprehensive authentication with local email/password and Microsoft Azure AD SSO
+  - Local auth: bcrypt password hashing (12 rounds), email-based registration, secure login
+  - Microsoft SSO: OAuth 2.0 / OpenID Connect with JWKS-based ID token validation
+  - Password reset: Token-based with 24-hour expiry
+  - Session management: Express sessions with Passport.js
+- **Security Hardening**:
+  - Admin-only access to sensitive user data (/api/users requires admin role)
+  - Full OIDC ID token validation using jwks-rsa (signature, issuer, audience, expiry)
+  - CSRF protection on OAuth callbacks with state parameter
+  - Cross-validation of ID token claims against Microsoft Graph API
+- **Admin SSO Configuration**: Settings page for tenant IDs, allowed domains, auto-provisioning, default roles
+- **User Management**: Admin can view auth providers, enable/disable users, unlink Microsoft accounts
+- Fixed stage dropdown loading in deal creation dialog
+- Restricted internal deal fields to admin-only access
 
 ## User Preferences
 
@@ -70,15 +80,25 @@ Preferred communication style: Simple, everyday language.
 - **PostgreSQL**: Primary data store, connection via `DATABASE_URL` environment variable
 
 ### Authentication
-- **Replit Auth**: OIDC-based authentication using Replit's identity provider
-- Required environment variables: `ISSUER_URL`, `REPL_ID`, `SESSION_SECRET`
+- **Dual Authentication System**: Supports both local email/password and Microsoft Azure AD SSO
+- **Local Auth**: Email/password with bcrypt hashing, password reset tokens
+- **Microsoft SSO**: OAuth 2.0 / OpenID Connect with JWKS-based token validation
+- Required environment variables:
+  - `SESSION_SECRET`: Session encryption key
+  - `DATABASE_URL`: PostgreSQL connection string
+  - For Microsoft SSO (optional):
+    - `MICROSOFT_CLIENT_ID`: Azure AD application client ID
+    - `MICROSOFT_CLIENT_SECRET`: Azure AD application client secret
+    - `MICROSOFT_TENANT_ID`: Azure AD tenant ID (defaults to "common" for multi-tenant)
 
 ### Key NPM Packages
 - **drizzle-orm**: Type-safe database queries
 - **@tanstack/react-query**: Async state management
 - **@radix-ui/***: Accessible UI primitives
 - **@hello-pangea/dnd**: Drag and drop for Kanban
-- **passport** + **openid-client**: Authentication handling
+- **passport** + **passport-local**: Authentication strategies
+- **bcrypt**: Secure password hashing
+- **jsonwebtoken** + **jwks-rsa**: Microsoft ID token validation
 - **date-fns**: Date formatting utilities
 
 ### Build Tools
